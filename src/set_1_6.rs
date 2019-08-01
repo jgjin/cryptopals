@@ -1,9 +1,15 @@
+// need to use lib for encoding and decoding
+
 use crate::{
+    convert,
     encoded_string::{
         EncodedString,
     },
     io::{
         open_file,
+    },
+    permutate::{
+        Permutations,
     },
     set_1_3::{
         DecodeResult,
@@ -82,14 +88,49 @@ pub fn main(
     
     let try_key_sizes = vec![2, 5, 7];
 
+    let mut decode_results = vec![];
     try_key_sizes.into_iter().map(|key_size| {
         let blocks = transpose(&text.inner_string()[..], key_size);
         let candidates = blocks.into_iter().map(|block| {
-            decode_single(
+            let mut cand = decode_single(
                 &block.into_iter().collect::<String>()[..],
-            ).into_iter().take(3).collect::<Vec<DecodeResult>>()
-        }).collect::<Vec<Vec<DecodeResult>>>();
-        println!("{:?}", candidates);
+            );
+
+            cand.sort_unstable_by(|first, second| {
+                first.score.partial_cmp(&second.score).expect("error in sorting")
+            });
+
+
+            cand.into_iter().take(3).map(|res| {
+                res.key
+            }).collect::<Vec<EncodedString>>()
+        }).collect::<Vec<Vec<EncodedString>>>();
+
+        let mut permuter = Permutations::new(candidates);
+        while let Some(perm) = permuter.next() {
+            let full_key = perm.into_iter().map(|chr| {
+                chr.inner_string()
+            }).collect::<String>();
+
+            let key = EncodedString::Binary(full_key);
+            let decoded = text.xor(&key).to_ascii();
+            let score = decoded.freq_score();
+
+            decode_results.push(DecodeResult {
+                key: key,
+                encoded: EncodedString::ASCII("Too long, omitting".to_string()),
+                decoded: EncodedString::ASCII(decoded.inner_string().chars().take(144).collect::<String>()),
+                score: score,
+            });
+        }
+    }).last();
+
+    decode_results.sort_unstable_by(|first, second| {
+        first.score.partial_cmp(&second.score).expect("error in sorting")
+    });
+
+    decode_results.into_iter().take(50).map(|res| {
+        println!("{:?}", res);
     }).last();
 }
 
