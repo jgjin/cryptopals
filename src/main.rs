@@ -3,7 +3,6 @@
 mod convert;
 mod encoded_string;
 mod io;
-mod permutations;
 mod set_1_1;
 mod set_1_2;
 mod set_1_3;

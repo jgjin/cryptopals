@@ -32,7 +32,7 @@ pub fn pad_front_to(
 pub fn decode_single(
     encoded_str: &str,
 ) -> Vec<DecodeResult> {
-    let encoded = EncodedString::Hex(
+    let encoded = EncodedString::ASCII(
         encoded_str.to_string(),
     );
 

@@ -5,11 +5,9 @@ use crate::{
     io::{
         open_file,
     },
-    permutations::{
-        Permutations,
-    },
     set_1_3::{
-        pad_front_to,
+        DecodeResult,
+        decode_single,
     },
 };
 
@@ -64,18 +62,34 @@ fn get_key_sizes(
     }).collect()
 }
 
+fn transpose(
+    text: &str,
+    num_blocks: usize,
+) -> Vec<Vec<char>> {
+    let mut blocks = vec![vec![]; num_blocks];
+    text.chars().collect::<Vec<char>>().chunks(num_blocks).map(|chunk| {
+        chunk.iter().enumerate().map(|(index, chr)| {
+            blocks[index].push(*chr);
+        }).last();
+    }).last();
+
+    blocks
+}
+
 pub fn main(
 ) {
+    let text = EncodedString::Base64(open_file("set_1_6.txt").join("")).to_ascii();
+    
     let try_key_sizes = vec![2, 5, 7];
 
     try_key_sizes.into_iter().map(|key_size| {
-        let mut permutations = Permutations::new(0..255u8, key_size);
-        while let Some(key_vec) = permutations.next() {
-            let key_binary = key_vec.into_iter().map(|val| {
-                pad_front_to(&format!("{:b}", val)[..], 8, '0')
-            }).collect::<Vec<String>>().join("");
-            println!("{}", key_binary);
-        }
+        let blocks = transpose(&text.inner_string()[..], key_size);
+        let candidates = blocks.into_iter().map(|block| {
+            decode_single(
+                &block.into_iter().collect::<String>()[..],
+            ).into_iter().take(3).collect::<Vec<DecodeResult>>()
+        }).collect::<Vec<Vec<DecodeResult>>>();
+        println!("{:?}", candidates);
     }).last();
 }
 
