@@ -1,82 +1,67 @@
-// need to use lib for encoding and decoding
+extern crate hamming;
 
 use crate::{
-    convert,
-    encoded_string::{
-        EncodedString,
-    },
     io::{
         open_file,
     },
-    permutate::{
+    permute::{
         Permutations,
     },
+    set_1_2::{
+        xor,
+    },
     set_1_3::{
-        DecodeResult,
-        decode_single,
+        bytes_into_ascii,
+        get_single_byte_candidates,
     },
 };
 
 #[derive(Debug)]
 struct KeySizeCandidate {
     key_size: usize,
-    norm_avg_hamming_dist: f32,
+    score: f32,
 }
 
-fn split_bytes(
-    string: &str,
+#[allow(dead_code)]
+fn eval_key_size(
+    bytes: &Vec<u8>,
     key_size: usize,
-) -> (Vec<String>, Vec<String>) {
-    let chars = string.chars()
-        .take(key_size * 2)
-        .collect::<Vec<char>>();
-    let first = chars.chunks(key_size * 2).filter_map(|chunk| {
-        Some(chunk).filter(|chnk| {
-            chnk.len() == key_size * 2
-        }).map(|chnk| {
-            chnk.into_iter().take(key_size).collect::<String>()
-        })
-    }).collect();
-    let second = chars.chunks(key_size * 2).filter_map(|chunk| {
-        Some(chunk).filter(|chnk| {
-            chnk.len() == key_size * 2
-        }).map(|chnk| {
-            chnk.into_iter().skip(key_size).take(key_size).collect::<String>()
-        })
-    }).collect();
+) -> KeySizeCandidate {
+    let len = bytes.len();
+    let bytes_trunc = bytes.iter().cloned().take(
+        len - (len % (key_size * 2))
+    ).collect::<Vec<u8>>();
 
-    (first, second)
-}
+    let mut first = vec![];
+    let mut second = vec![];
+    bytes_trunc.chunks(key_size * 2).map(|chunk| {
+        first.push(chunk.iter().map(|byte| {
+            *byte
+        }).take(key_size).collect::<Vec<u8>>());
 
-fn get_key_sizes(
-    string: &str,
-) -> Vec<KeySizeCandidate> {
-    (2..40).map(|key_size| {
-        let (first, second) = split_bytes(string, key_size);
-        let avg_hamming_dist = first.iter().zip(
-            second.into_iter(),
-        ).map(|(first_chunk, second_chunk)| {
-            EncodedString::ASCII(first_chunk.to_string()).hamming_dist(
-                &EncodedString::ASCII(second_chunk.to_string())
-            )
-        }).sum::<usize>() as f32 / first.len() as f32;
+        second.push(bytes.iter().map(|byte| {
+            *byte
+        }).skip(key_size).take(key_size).collect::<Vec<u8>>());
+    }).last();
 
-        KeySizeCandidate {
-            key_size: key_size,
-            norm_avg_hamming_dist: avg_hamming_dist / key_size as f32,
-        }
-    }).collect()
-}
+    let avg_dist = first.iter().zip(second.iter()).map(|(first_chunk, second_chunk)| {
+        hamming::distance(first_chunk, second_chunk)
+    }).sum::<u64>() as f32 / first.len() as f32;
+
+    KeySizeCandidate {
+        key_size: key_size,
+        score: avg_dist / key_size as f32,
+    }
+} // outputted to key_sizes_1_6.txt
 
 fn transpose(
-    text: &str,
+    bytes: &Vec<u8>,
     num_blocks: usize,
-) -> Vec<Vec<char>> {
+) -> Vec<Vec<u8>> {
     let mut blocks = vec![vec![]; num_blocks];
-    text.chars().collect::<Vec<char>>().chunks(num_blocks).map(|chunk| {
-        chunk.iter().enumerate().map(|(index, chr)| {
-            blocks[index].push(*chr);
-        }).last();
+
+    bytes.iter().enumerate().map(|(index, byte)| {
+        blocks[index % num_blocks].push(*byte);
     }).last();
 
     blocks
@@ -84,97 +69,47 @@ fn transpose(
 
 pub fn main(
 ) {
-    let text = EncodedString::Base64(open_file("set_1_6.txt").join("")).to_ascii();
-    
-    let try_key_sizes = vec![2, 5, 7];
+    let bytes = base64::decode(&open_file("set_1_6.txt").join("")[..]).expect("error converting base64");
 
-    let mut decode_results = vec![];
-    try_key_sizes.into_iter().map(|key_size| {
-        let blocks = transpose(&text.inner_string()[..], key_size);
-        let candidates = blocks.into_iter().map(|block| {
-            let mut cand = decode_single(
-                &block.into_iter().collect::<String>()[..],
-            );
+    // let mut key_size_candidates = (2..=40).map(|key_size| {
+    //     eval_key_size(&bytes, key_size)
+    // }).collect::<Vec<KeySizeCandidate>>();
 
-            cand.sort_unstable_by(|first, second| {
+    // key_size_candidates.sort_unstable_by(|first, second| {
+    //     first.score.partial_cmp(&second.score).expect("error in sorting")
+    // });
+
+    // key_size_candidates.iter().map(|candidate| {
+    //     println!("{:?}", candidate);
+    // }).last();
+
+    let key_sizes = vec![29];
+    let candidates = key_sizes.into_iter().filter_map(|key_size| {
+        let blocks = transpose(&bytes, key_size);
+        let key_candidates = blocks.into_iter().map(|block| {
+            let mut specific_candidates = get_single_byte_candidates(&block, true, false, Some(144));
+            specific_candidates.sort_unstable_by(|first, second| {
                 first.score.partial_cmp(&second.score).expect("error in sorting")
             });
 
+            specific_candidates.into_iter().map(|candidate| {
+                candidate.key[0]
+            }).take(1).collect()
+        }).collect::<Vec<Vec<u8>>>();
 
-            cand.into_iter().take(3).map(|res| {
-                res.key
-            }).collect::<Vec<EncodedString>>()
-        }).collect::<Vec<Vec<EncodedString>>>();
+        if key_candidates.iter().all(|x| {
+            !x.is_empty()
+        }) {
+            return Some(key_candidates);
+        }
+        return None;
+    }).collect::<Vec<Vec<Vec<u8>>>>();
 
-        let mut permuter = Permutations::new(candidates);
-        while let Some(perm) = permuter.next() {
-            let full_key = perm.into_iter().map(|chr| {
-                chr.inner_string()
-            }).collect::<String>();
-
-            let key = EncodedString::Binary(full_key);
-            let decoded = text.xor(&key).to_ascii();
-            let score = decoded.freq_score();
-
-            decode_results.push(DecodeResult {
-                key: key,
-                encoded: EncodedString::ASCII("Too long, omitting".to_string()),
-                decoded: EncodedString::ASCII(decoded.inner_string().chars().take(144).collect::<String>()),
-                score: score,
-            });
+    candidates.into_iter().map(|possibilities| {
+        let mut perm = Permutations::new(possibilities);
+        while let Some(key) = perm.next() {
+            let decoded = bytes_into_ascii(&xor(&bytes, &key)).expect("error converting ascii");
+            println!("{}", decoded);
         }
     }).last();
-
-    decode_results.sort_unstable_by(|first, second| {
-        first.score.partial_cmp(&second.score).expect("error in sorting")
-    });
-
-    decode_results.into_iter().take(50).map(|res| {
-        println!("{:?}", res);
-    }).last();
-}
-
-#[cfg(test)]
-
-#[test]
-fn test_hamming_dist(
-) {
-    assert_eq!(
-        EncodedString::ASCII("this is a test".to_string()).hamming_dist(
-            &EncodedString::ASCII("wokka wokka!!!".to_string()),
-        ),
-        37,
-    );
-}
-
-#[test]
-fn test_split_bytes_exact(
-) {
-    assert_eq!(
-        split_bytes(
-            &EncodedString::ASCII("a tester".to_string()).inner_string()[..],
-            2,
-        ),
-        (
-            vec!["a ".to_string(), "st".to_string()],
-            vec!["te".to_string(), "er".to_string()],
-        )
-    );
-}
-
-#[test]
-fn test_split_bytes_unbalanced(
-) {
-    assert_eq!(
-        split_bytes(
-            &EncodedString::ASCII(
-                "a tester is here".to_string(),
-            ).inner_string()[..],
-            3,
-        ),
-        (
-            vec!["a t".to_string(), "er ".to_string()],
-            vec!["est".to_string(), "is ".to_string()],
-        )
-    );
 }

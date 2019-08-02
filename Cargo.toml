@@ -5,4 +5,8 @@ authors = ["banana <jgjin@umich.edu>"]
 edition = "2018"
 
 [dependencies]
+ascii = "0.9"
+base64 = "0.10"
+hamming = "0.1"
+hex = "0.3"
 lazy_static = "1.3"
