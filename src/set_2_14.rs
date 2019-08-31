@@ -188,6 +188,7 @@ fn get_bytes_after(
     known_so_far
 }
 
+#[allow(dead_code)]
 pub fn main(
 ) {
     let encrypter = NewECBEncrypter::new();
