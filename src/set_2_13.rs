@@ -103,6 +103,7 @@ impl ProfileCrypter {
     }
 }
 
+#[allow(dead_code)]
 pub fn main(
 ) {
     // Assume we know format is email=X&uid=10&role=Y
