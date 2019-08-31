@@ -1,8 +1,8 @@
 extern crate hex;
 
 pub fn xor(
-    text: &Vec<u8>,
-    key: &Vec<u8>,
+    text: &[u8],
+    key: &[u8],
 ) -> Vec<u8> {
     text.iter().zip(key.iter().cycle()).map(|(first_byte, second_byte)| {
         first_byte ^ second_byte

@@ -67,6 +67,7 @@ fn transpose(
     blocks
 }
 
+#[allow(dead_code)]
 pub fn main(
 ) {
     let bytes = base64::decode(&open_file("set_1_6.txt").join("")[..]).expect("error converting base64");
