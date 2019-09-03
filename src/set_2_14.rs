@@ -1,3 +1,4 @@
+extern crate openssl;
 extern crate rand;
 
 use std::{

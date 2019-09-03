@@ -1,3 +1,5 @@
+extern crate openssl;
+
 use std::{
     collections::{
         BTreeMap,
