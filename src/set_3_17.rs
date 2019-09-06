@@ -54,11 +54,6 @@ impl NewCBCCrypter {
 
         let mut lines = open_file("set_3_17.txt");
         let index = rng.gen_range(0, lines.len());
-        println!(
-            "orig data {:?}",
-            base64::decode(&lines[index][..])
-                .expect("error converting base64"),
-        );
 
         Self {
             data: base64::decode(&lines.remove(index)[..])
@@ -154,6 +149,7 @@ fn padding_attack(
     output
 }
 
+#[allow(dead_code)]
 pub fn main(
 ) {
     let crypter = NewCBCCrypter::new();

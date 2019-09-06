@@ -19,8 +19,10 @@ mod set_2_14;
 mod set_2_15;
 mod set_2_16;
 mod set_3_17;
+mod set_3_18;
+mod set_3_20;
 mod static_values;
 
 fn main() {
-    set_3_17::main();
+    set_3_20::main();
 }
